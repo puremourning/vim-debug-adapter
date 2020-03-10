@@ -2,9 +2,10 @@ import * as DA from 'vscode-debugadapter'
 import { DebugProtocol } from 'vscode-debugprotocol'
 import * as net from 'net'
 import * as readline from 'readline'
+import * as path from 'path'
 
 // TODO: Fix this path, obviously
-const NUB = '/Users/ben/Development/vim-debug-adapter/nub.vim'
+const NUB = path.resolve( __dirname, '..', 'runtime', 'nub.vim' )
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
   vim?: string,
