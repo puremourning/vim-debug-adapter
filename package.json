@@ -1,0 +1,25 @@
+{
+  "name": "vim-debug-adapter",
+  "version": "1.0.0",
+  "description": "Debug Adapter for Vimscript Debugging",
+  "main": "dist/index.js",
+  "repository": "https://github.com/puremourning/vim-debug-adapter",
+  "dependencies": {
+    "vscode-debugadapter": "^1.38.0"
+  },
+  "devDependencies": {
+    "@types/node": "^13.7.4",
+    "typescript": "^3.8.2"
+  },
+  "scripts": {
+    "watch": "npx tsc -w",
+    "compile": "npx tsc"
+  },
+  "keywords": [
+    "vim",
+    "debugadapter",
+    "debugger"
+  ],
+  "author": "Ben Jackson",
+  "license": "Apache-2.0"
+}
