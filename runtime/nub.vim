@@ -53,9 +53,60 @@ function! s:OnChannelMessage( chan, msg ) abort
   " TODO/FIXME: If i change a:msg to msg here, vim crashes
   call ch_log( "Got a message without a callback: " .. string( a:msg ) )
 
-  " threads - simulated by DA (only 1)
+  if a:msg.Function ==# 'clearLineBreakpoints'
+    let breakpoints = split( execute( 'breaklist' ), "\n" )
 
-  " stackTrace
+    if len( breakpoints ) == 1 && breakpoints[ 0 ] ==# 'No breakpoints defined'
+      let breakpoints = []
+    endif
+
+    for breakpoint in breakpoints
+      let matches = matchlist(
+            \ breakpoint,
+            \ '\v\C^\s*([0-9]+)\s+(\w+)\s+(.*)\s+line\s+([0-9]+)$' )
+
+      call ch_log( 'Breakpoint (' .. breakpoint .. '): ' .. string( matches ) )
+
+      if len( matches ) >= 5
+        let [ ignore, id, type, name, line ] = matches[ : 4 ]
+        if type ==# 'file' && name ==# a:msg.Arguments.file
+          execute 'breakdel ' .. idx
+        endif
+      else
+        throw "Could not parse breakpoint "
+              \ .. breakpoint
+              \ .. "( " .. string( matches ) .. ")"
+      endif
+    endfor
+
+    call ch_sendexpr( a:chan, #{
+          \   Message_type: 'Reply',
+          \   Function: a:msg.Function,
+          \   Arguments: #{
+          \      request_id: a:msg.Arguments.request_id,
+          \   }
+          \ } )
+
+    return
+  endif
+
+  if a:msg.Function ==# 'setLineBreakpoint'
+    " Silent by default in a chan callback
+    execute 'breakadd file '
+          \ .. a:msg.Arguments.line
+          \ .. ' '
+          \ .. a:msg.Arguments.file
+
+    call ch_sendexpr( a:chan, #{
+          \   Message_type: 'Reply',
+          \   Function: a:msg.Function,
+          \   Arguments: #{
+          \      request_id: a:msg.Arguments.request_id,
+          \   }
+          \ } )
+    return
+  endif
+
   if a:msg.Function ==# "stackTrace"
     let stack = debug_getstack()
     " If we're paused in the debugger, top of stack is always the DebugHook, so
@@ -73,7 +124,9 @@ function! s:OnChannelMessage( chan, msg ) abort
           \   }
           \ } )
     return
-  elseif a:msg.Function ==# "variables"
+  endif
+
+  if a:msg.Function ==# "variables"
     let vars = debug_getvariables( a:msg.Arguments.stack_level,
                                  \ a:msg.Arguments.scope )
 
@@ -85,7 +138,10 @@ function! s:OnChannelMessage( chan, msg ) abort
           \      vars: vars,
           \   }
           \ } )
-  elseif a:msg.Function ==# 'evaluate'
+    return
+  endif
+
+  if a:msg.Function ==# 'evaluate'
     " FIXME: This ignores Arguments.stack_level and therefore doesn't work for
     " local vars etc.
     try
@@ -105,11 +161,8 @@ function! s:OnChannelMessage( chan, msg ) abort
           \      type: type( result ),
           \   }
           \ } )
+    return
   endif
-
-  " scopes - guessed in the DA
-
-  " variables
 
   " pause
 endfunction

@@ -4,7 +4,6 @@ import * as net from 'net'
 import * as readline from 'readline'
 import * as path from 'path'
 
-// TODO: Fix this path, obviously
 const NUB = path.resolve( __dirname, '..', 'runtime', 'nub.vim' )
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
@@ -142,9 +141,43 @@ export class VimDebugSession extends DA.LoggingDebugSession {
   // attachRequest
     // this.sendEvent(new DA.InitializedEvent());
 
-  protected setBreakPointsRequest(
+  protected async setBreakPointsRequest(
     response: DebugProtocol.SetBreakpointsResponse,
     args: DebugProtocol.SetBreakpointsArguments ) {
+
+    const breakpoints = args.breakpoints || [];
+    response.body = response.body || {};
+    response.body.breakpoints = [];
+
+    var promises : Promise<VimMessage>[] = [];
+
+    promises.push( this.requestFromVim( {
+      Message_type: "Request",
+      Function: "clearLineBreakpoints",
+      Arguments: {
+        'file': args.source.path,
+      }
+    } ) )
+
+    for ( const bp of breakpoints ) {
+      promises.push( this.requestFromVim( {
+        Message_type: "Request",
+        Function: "setLineBreakpoint",
+        Arguments: {
+          'file': args.source.path,
+          'line': bp.line
+        }
+      } ) )
+
+      response.body.breakpoints.push(
+        new DA.Breakpoint( true,
+                           bp.line,
+                           0,
+                           new DA.Source( args.source.name!,
+                                          args.source.path ) ) );
+    }
+
+    await Promise.all( promises );
 
     this.sendResponse( response );
   }
