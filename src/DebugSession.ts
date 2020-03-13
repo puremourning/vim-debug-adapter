@@ -118,9 +118,23 @@ export class VimDebugSession extends DA.LoggingDebugSession {
               .on( 'line', this.onVimData.bind( this ) )
               .on( 'close', this.onVimConnectionClosed.bind( this ) );
 
-      // Now that Vim is connected, we can request breakpoints
-      this.sendEvent( new DA.InitializedEvent() );
-
+      // We will send the "InitializedEvent" later, when the NUB requests the
+      // "Initialize" from us. The way this works is:
+      //
+      // Client    Adapter         Vim
+      // |             |             |
+      // | launch----->|             |
+      // |       <-----runInTerm     |
+      // | start-------------------->o
+      // |       <----launchResponse |
+      // |             |connect----->|<-openSocket
+      // |             | (*here)
+      // |             |    <--------Request(Initialize)
+      // |       <----InitializedEvent
+      // | bkpnt------>|------------>|
+      // | bkpnt------>|------------>|
+      // | bkpnt------>|------------>|
+      // | init done-->|    -------->|Response(Initialize)
     } );
     server.maxConnections = 1;
     server.listen( args.port || 4321 );
@@ -193,6 +207,24 @@ export class VimDebugSession extends DA.LoggingDebugSession {
   protected configurationDoneRequest(
     response: DebugProtocol.ConfigurationDoneResponse,
     args: DebugProtocol.ConfigurationDoneArguments ): void {
+
+    // We should only get this message while vim is wiating for the Initialize
+    // exchange (see comment in launch for explanation)
+    if (!this.vim_command_request) {
+      // For some reason we've initialized before Vim has requested the init
+      // message.
+      this.sendErrorResponse( response, -200, "Vim is not paused" );
+      return;
+    } else if (this.vim_command_request.msg.Function !== 'Initialize') {
+      // again something else bad has happened, we're in a dodgy state
+      this.sendErrorResponse( response, -201, "Vim is not waiting for init" );
+      return;
+    }
+
+    this.writeResponseToVim( {
+      Message_type: 'Reply',
+      Function: this.vim_command_request.msg.Function,
+    } )
 
     this.sendResponse( response );
   }
@@ -339,6 +371,9 @@ export class VimDebugSession extends DA.LoggingDebugSession {
     if (!this.vim_command_request) {
       this.sendErrorResponse( response, -100, "Vim is not paused" );
       return;
+    } else if (this.vim_command_request.msg.Function !== 'GetCommand') {
+      this.sendErrorResponse( response, -101, "Vim is not initialized" );
+      return;
     }
 
     this.writeResponseToVim( {
@@ -441,8 +476,20 @@ export class VimDebugSession extends DA.LoggingDebugSession {
           id: id,
           msg: msg,
         };
-      }
+      } else if (msg.Function == 'Initialize' ) {
 
+        this.vim_command_request = {
+          id: id,
+          msg: msg
+        };
+
+        // TODO: 
+        // if ( this.init_promise ) {
+        //   this.init_promise.resolve();
+        // }
+        this.sendEvent( new DA.InitializedEvent() );
+
+      }
       break;
     case 'Reply':
       // resolve a promise for the request ID

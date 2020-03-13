@@ -198,7 +198,18 @@ function! s:Connect() abort
     return
   endif
 
-  echom "Connected to the debug adapter."
+  echom "Connected to the debug adapter, waiting for init."
+
+  let cmd = {}
+  while empty( cmd ) && s:Connected()
+    call ch_log( "Waiting for command from debugger..." )
+    " Wait until we get a completion, but handle other requests.
+    let cmd = ch_evalexpr( s:dap, #{ Message_type: "Request",
+                                   \ Function: "Initialize" },
+                                   \ #{ timeout: 10000 } )
+  endwhile
+
+  echom "Got debugger init response... booting"
 
 endfunction
 
