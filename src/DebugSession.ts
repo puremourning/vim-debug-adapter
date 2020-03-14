@@ -40,8 +40,9 @@ interface PendingRequest {
 interface VimFrame {
   stack_level: number,
   name: string,
-  source_line: number,
-  source_file: string,
+  line: number,
+  source_line?: number,
+  source_file?: string,
   type: "UFUNC" | "SCRIPT" | "AUCMD" | string
 };
 
@@ -279,11 +280,12 @@ export class VimDebugSession extends DA.LoggingDebugSession {
       response.body.stackFrames.push( {
         id: frame.stack_level,
         name: frame.name,
-        line: frame.source_line,
+        line: frame.source_line || frame.line,
         column: 0,
         source: {
-          name: frame.source_file,
-          path: frame.source_file,
+          name: frame.source_file ? path.basename( frame.source_file )
+                                  : undefined,
+          path: frame.source_file || undefined,
         }
       } );
     }
