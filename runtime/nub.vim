@@ -97,6 +97,8 @@ function! s:OnChannelMessage( chan, msg ) abort
           \ .. ' '
           \ .. a:msg.Arguments.file
 
+    echom "Added breakpoint at" a:msg.Arguments.file ":" a:msg.Arguments.line
+
     call ch_sendexpr( a:chan, #{
           \   Message_type: 'Reply',
           \   Function: a:msg.Function,
@@ -169,27 +171,34 @@ endfunction
 
 function! s:Connect() abort
   if exists( '$VIMTROSPECT_PORT' )
-    let s:debugger_address = $VIMTROSPECT_PORT
+    let debugger_address = $VIMTROSPECT_PORT
   else
-    let s:debugger_address = 'localhost:4321'
+    let debugger_address = 'localhost:4321'
+  endif
+
+  if exists( '$VIMTROSPECT_WAIT' )
+    let waittime = 999999
+  else
+    let waittime = 10000
   endif
 
   let s:log_file = expand( '~/.vimtrospect.log' )
   call ch_logfile( s:log_file, 'w' )
 
-  echom "Connecting to debugger at " .. s:debugger_address
+  echom 'Vimtrospector: Starting up vim with PID:' getpid()
+  echom "Connecting to debugger at " .. debugger_address
   echom "Logging messages to " .. s:log_file
 
   try
-    let s:dap = ch_open( s:debugger_address, #{
+    let s:dap = ch_open( debugger_address, #{
           \   mode: 'json',
           \   callback: funcref( 's:OnChannelMessage' ),
           \   close_cb: funcref( 's:OnChannelClosed' ),
           \   drop: 'never',
-          \   waittime: 10000,
+          \   waittime: waittime,
           \ } )
   catch /E902/
-    echom "Unable to connect to " .. s:debugger_address .. "..."
+    echom "Unable to connect to " .. debugger_address .. "..."
     sleep 500m
   endtry
 

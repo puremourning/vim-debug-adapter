@@ -1,21 +1,24 @@
 import * as DA from 'vscode-debugadapter'
+import { logger, Logger } from 'vscode-debugadapter'
 import { DebugProtocol } from 'vscode-debugprotocol'
 import * as net from 'net'
 import * as readline from 'readline'
 import * as path from 'path'
 
 const NUB = path.resolve( __dirname, '..', 'runtime', 'nub.vim' )
+const DEFAULT_PORT = 4321;
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
   vim?: string,
   env?: { [key: string]: string },
   cwd?: string,
   port?: number
+  trace?: boolean,
 };
 
 interface AttachRequestArguments extends DebugProtocol.AttachRequestArguments {
-
-  trace?: boolean
+  port?: number
+  trace?: boolean,
 };
 
 interface VimRequest {
@@ -39,7 +42,7 @@ interface VimFrame {
   name: string,
   source_line: number,
   source_file: string,
-  type: "UFUNC" | "SCRIPT"
+  type: "UFUNC" | "SCRIPT" | "AUCMD" | string
 };
 
 interface VimVar {
@@ -106,38 +109,14 @@ export class VimDebugSession extends DA.LoggingDebugSession {
   }
 
   // launchRequest
-  protected async launchRequest(
+  protected launchRequest(
     response: DebugProtocol.LaunchResponse,
     args: LaunchRequestArguments ) {
 
-    // Start the Vim server
-    let server = net.createServer( (c) => {
-      this.vim = c;
-      c.setEncoding( 'utf8' );
-      readline.createInterface( { input: c } )
-              .on( 'line', this.onVimData.bind( this ) )
-              .on( 'close', this.onVimConnectionClosed.bind( this ) );
+    logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop,
+                 false);
 
-      // We will send the "InitializedEvent" later, when the NUB requests the
-      // "Initialize" from us. The way this works is:
-      //
-      // Client    Adapter         Vim
-      // |             |             |
-      // | launch----->|             |
-      // |       <-----runInTerm     |
-      // | start-------------------->o
-      // |       <----launchResponse |
-      // |             |connect----->|<-openSocket
-      // |             | (*here)
-      // |             |    <--------Request(Initialize)
-      // |       <----InitializedEvent
-      // | bkpnt------>|------------>|
-      // | bkpnt------>|------------>|
-      // | bkpnt------>|------------>|
-      // | init done-->|    -------->|Response(Initialize)
-    } );
-    server.maxConnections = 1;
-    server.listen( args.port || 4321 );
+    this.attachToVim( args.port || DEFAULT_PORT );
 
     // Launch Vim
     this.runInTerminalRequest( {
@@ -153,7 +132,55 @@ export class VimDebugSession extends DA.LoggingDebugSession {
   }
 
   // attachRequest
-    // this.sendEvent(new DA.InitializedEvent());
+  protected attachRequest(
+    response: DebugProtocol.AttachResponse,
+    args: AttachRequestArguments ) {
+
+    logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop,
+                 false);
+
+    this.attachToVim( args.port || DEFAULT_PORT );
+    this.did_start_vim = false;
+    this.sendResponse(response);
+  }
+
+  protected async attachToVim( port: number ) {
+    // Start the Vim server
+    let server = net.createServer( (c) => {
+      this.vim = c;
+      c.setEncoding( 'utf8' );
+      readline.createInterface( { input: c } )
+              .on( 'line', this.onVimData.bind( this ) )
+              .on( 'close', this.onVimConnectionClosed.bind( this ) );
+
+      // We will send the "InitializedEvent" later, when the NUB requests the
+      // "Initialize" from us. The way this works is:
+      //
+      // Client    Adapter         Vim
+      // |             |             |
+      // LAUNCH {{{
+      // | launch----->|             |
+      // |       <-----runInTerm     |
+      // | start-------------------->o
+      // |            |              |<-openSocket
+      // |       <----launchResponse |
+      // }}} or ATTACH {{{
+      // |            |              |<-openSocket
+      // | attach----->|             |
+      // }}}
+      // |             |connect----->|
+      // |             | (*here)
+      // |             |    <--------Request(Initialize)
+      // |       <----InitializedEvent
+      // | bkpnt------>|------------>|
+      // | bkpnt------>|------------>|
+      // | bkpnt------>|------------>|
+      // | init done-->|    -------->|Response(Initialize)
+    } );
+    server.maxConnections = 1;
+    server.listen( port );
+  }
+
 
   protected async setBreakPointsRequest(
     response: DebugProtocol.SetBreakpointsResponse,
@@ -452,13 +479,13 @@ export class VimDebugSession extends DA.LoggingDebugSession {
         reject: reject
       } );
       const data = JSON.stringify( [ 0, request ] ) + '\n' 
-      console.error( "TX Vim: ", data );
+      DA.logger.log( "TX Vim: " + data, DA.Logger.LogLevel.Verbose );
       this.vim!.write( data );
     } );
   }
 
   private onVimData( data: string ) {
-    console.error( "RX Vim: ", data );
+    DA.logger.log( "RX Vim: " + data, DA.Logger.LogLevel.Verbose );
     const vim_msg = JSON.parse( data );
     // msg is a list of [ <id>, <actual msg> ]
     const id = vim_msg[ 0 ];
@@ -472,11 +499,14 @@ export class VimDebugSession extends DA.LoggingDebugSession {
       break;
     case 'Request':
       if (msg.Function === 'GetCommand') {
+        // TODO: i really don't like this; it certainly needs a better name now
+        // that it's not just GetCommand; it's really a long-poll style request;
+        // maybe call it current_vim_poll_request
         this.vim_command_request = {
           id: id,
           msg: msg,
         };
-      } else if (msg.Function == 'Initialize' ) {
+      } else if (msg.Function === 'Initialize' ) {
 
         this.vim_command_request = {
           id: id,
