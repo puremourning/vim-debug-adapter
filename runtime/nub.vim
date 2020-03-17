@@ -36,11 +36,6 @@ function! DebugHook() abort
 
   call ch_log( "Got command from debugger: " .. string( cmd ) )
 
-  " step in
-  " step out
-  " step over
-  " continue
-  " etc. - any command actually
   return cmd.Arguments.Command
 endfunction
 
