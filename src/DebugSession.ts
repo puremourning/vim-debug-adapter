@@ -10,6 +10,7 @@ const DEFAULT_PORT = 4321;
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
   vim?: string,
+  args?: string[],
   env?: { [key: string]: string },
   cwd?: string,
   port?: number
@@ -121,7 +122,8 @@ export class VimDebugSession extends DA.LoggingDebugSession {
 
     // Launch Vim
     this.runInTerminalRequest( {
-      args: [ args.vim || 'vim', '--cmd', 'source ' + NUB ],
+      args: [ args.vim || 'vim', '--cmd', 'source ' + NUB ].concat(
+        args.args || [] ),
       env: args.env,
       cwd: args.cwd || '',
       kind: 'integrated',
