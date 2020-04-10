@@ -142,7 +142,8 @@ function! s:OnChannelMessage( chan, msg ) abort
     " FIXME: This ignores Arguments.stack_level and therefore doesn't work for
     " local vars etc.
     try
-      let result = eval( a:msg.Arguments.expression )
+      let result = debug_eval( a:msg.Arguments.stack_level,
+                             \ a:msg.Arguments.expression )
     catch /.*/
       let result = v:exception
     endtry
