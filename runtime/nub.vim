@@ -215,6 +215,7 @@ function! s:Connect() abort
   endwhile
 
   echom "Got debugger init response... booting"
+  set debugfunc=DebugHook
 
 endfunction
 
