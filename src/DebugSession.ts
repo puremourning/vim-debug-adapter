@@ -498,7 +498,7 @@ export class VimDebugSession extends DA.LoggingDebugSession {
     switch (msg.Message_type) {
     case 'Notify':
       if (msg.Function === 'Break') {
-        this.sendEvent( new DA.StoppedEvent( 'breakpoint', 0 ) );
+        this.sendEvent( new DA.StoppedEvent( msg.Arguments[ 'Reason' ], 0 ) );
       }
       break;
     case 'Request':

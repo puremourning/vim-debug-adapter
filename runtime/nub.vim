@@ -8,14 +8,14 @@ function s:Connected() abort
     return v:false
   endif
 
-  if ch_status( s:dap ) != 'open'
+  if ch_status( s:dap ) !=# 'open'
     return v:false
   endif
 
   return v:true
 endfunction
 
-function! DebugHook() abort
+function! DebugHook( breakreason ) abort
   if !s:Connected()
     return ''
   endif
@@ -23,7 +23,7 @@ function! DebugHook() abort
   " We have been called to get a command to execute due to a breakpoint
   call ch_sendexpr( s:dap, #{ Message_type: "Notify",
                             \ Function: "Break",
-                            \ Arguments: #{ Reason: "Breakpoint" } } )
+                            \ Arguments: #{ Reason: a:breakreason } } )
 
   let cmd = {}
   while empty( cmd ) && s:Connected()
