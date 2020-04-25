@@ -379,6 +379,19 @@ export class VimDebugSession extends DA.LoggingDebugSession {
     this.sendResponse( response );
   }
 
+  protected pauseRequest(
+    response: DebugProtocol.PauseResponse,
+    args: DebugProtocol.PauseArguments ) {
+
+    if ( this.vim_command_request ) {
+      this.sendErrorResponse( response, -401, "Paused alrady" );
+      return;
+    }
+
+    this.writeCommandToVim( "ex", "breakint" );
+    this.sendResponse( response );
+  }
+
   protected disconnectRequest(
     response: DebugProtocol.DisconnectResponse,
     args: DebugProtocol.DisconnectArguments ) {
