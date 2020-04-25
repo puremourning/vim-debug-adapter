@@ -384,8 +384,14 @@ export class VimDebugSession extends DA.LoggingDebugSession {
     args: DebugProtocol.DisconnectArguments ) {
 
     if (args.terminateDebuggee || this.did_start_vim) {
-      this.vimCommand( response, ':qa!', );
-    } else {
+      if (this.vim_command_request) {
+        this.vimCommand( response, ':qa!', );
+      } else {
+        // vim is currently running, not paused
+        this.writeCommandToVim( "ex", "qa!" );
+        this.sendResponse( response );
+      }
+    } else if (this.vim_command_request) {
       this.vimCommand( response, 'quit', );
     }
   }
@@ -467,11 +473,18 @@ export class VimDebugSession extends DA.LoggingDebugSession {
   }
 
   private writeResponseToVim( response: VimMessage ) {
-    this.vim!.write( JSON.stringify( [
-      this.vim_command_request!.id,
-      response
-    ] ) + '\n' );
+    this.writeToVim( [ this.vim_command_request!.id, response ] );
     this.vim_command_request = undefined;
+  }
+
+  private writeCommandToVim( mode: "ex"|"normal", cmd: string ) {
+    this.writeToVim( [ mode, cmd ] );
+  }
+
+  private writeToVim( obj: any ) {
+    const data = JSON.stringify( obj ) + '\n'
+    DA.logger.log( "TX Vim: " + data, DA.Logger.LogLevel.Verbose );
+    this.vim!.write( data );
   }
 
   private async requestFromVim( request: VimMessage ): Promise<VimMessage> {
@@ -482,9 +495,7 @@ export class VimDebugSession extends DA.LoggingDebugSession {
         resolve: resolve,
         reject: reject
       } );
-      const data = JSON.stringify( [ 0, request ] ) + '\n' 
-      DA.logger.log( "TX Vim: " + data, DA.Logger.LogLevel.Verbose );
-      this.vim!.write( data );
+      this.writeToVim( [ 0, request ] )
     } );
   }
 
