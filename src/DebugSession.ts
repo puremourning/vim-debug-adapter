@@ -122,7 +122,7 @@ export class VimDebugSession extends DA.LoggingDebugSession {
 
     // Launch Vim
     this.runInTerminalRequest( {
-      args: [ args.vim || 'vim', '--cmd', 'source ' + NUB ].concat(
+      args: [ args.vim || 'vim', '-N', '--cmd', 'source ' + NUB ].concat(
         args.args || [] ),
       env: args.env,
       cwd: args.cwd || '',
@@ -480,7 +480,7 @@ export class VimDebugSession extends DA.LoggingDebugSession {
       }
     } )
 
-    response.body.result = vim_response.Arguments[ 'result' ];
+    response.body.result = vim_response.Arguments[ 'result' ] as string;
 
     this.sendResponse( response );
   }
