@@ -471,6 +471,7 @@ export class VimDebugSession extends DA.LoggingDebugSession {
 
     response.body = response.body || {};
 
+    // TODO: If the context is 'repl' , get vim to execute as an Ex command
     const vim_response = await this.requestFromVim( {
       Message_type: "Request",
       Function: "evaluate",
