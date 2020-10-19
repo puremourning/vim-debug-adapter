@@ -471,15 +471,31 @@ export class VimDebugSession extends DA.LoggingDebugSession {
 
     response.body = response.body || {};
 
-    // TODO: If the context is 'repl' , get vim to execute as an Ex command
-    const vim_response = await this.requestFromVim( {
-      Message_type: "Request",
-      Function: "evaluate",
-      Arguments: {
-        'expression': args.expression,
-        'stack_level': args.frameId
-      }
-    } )
+    var vim_response: VimMessage;
+    if ( args.context == 'repl' ) {
+      vim_response = await this.requestFromVim( {
+        Message_type: "Request",
+        Function: "execute",
+        Arguments: {
+          'command': args.expression,
+          'stack_level': args.frameId
+        }
+      } )
+    } else {
+      // TODO: perhaps we should change this to this.vimCommand( args.expression
+      // ); this would make normal debug commands work, though the behaviour
+      // would be odd (it would print in the vim not return to the caller).
+      //
+      // Perhaps if we prefix with `-` or something?
+      vim_response = await this.requestFromVim( {
+        Message_type: "Request",
+        Function: "evaluate",
+        Arguments: {
+          'expression': args.expression,
+          'stack_level': args.frameId
+        }
+      } )
+    }
 
     response.body.result = vim_response.Arguments[ 'result' ] as string;
 

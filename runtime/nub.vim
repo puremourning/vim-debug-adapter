@@ -162,6 +162,25 @@ function! s:OnChannelMessage( chan, msg ) abort
     return
   endif
 
+  if a:msg.Function ==# 'execute'
+    try
+      let result = execute( a:msg.Arguments.command )
+    catch /.*/
+      let result = v:exception
+    endtry
+
+    call ch_sendexpr( a:chan, #{
+          \   Message_type: 'Reply',
+          \   Function: a:msg.Function,
+          \   Arguments: #{
+          \     request_id: a:msg.Arguments.request_id,
+          \     result: result,
+          \     type: type( result ),
+          \   }
+          \ } )
+    return
+  endif
+
   " pause
 endfunction
 
