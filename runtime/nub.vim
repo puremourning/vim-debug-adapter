@@ -150,6 +150,8 @@ function! s:OnChannelMessage( chan, msg ) abort
 
     " FIXME: type( result ) returns a number whereas the vars result is a string
     " naming the type.
+    " FIXME: If result contains/is a funcref then this throws E1161 Cannot json
+    " encode a func
     call ch_sendexpr( a:chan, #{
           \   Message_type: 'Reply',
           \   Function: a:msg.Function,
