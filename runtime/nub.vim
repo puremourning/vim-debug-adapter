@@ -44,6 +44,11 @@ function! s:OnChannelClosed( chan ) abort
   unlet s:dap
 endfunction
 
+function! Breakpoint() abort
+  " Call this to trigger a breakpoint now?
+  execute 'breakint'
+endfunction
+
 function! s:OnChannelMessage( chan, msg ) abort
   " TODO/FIXME: If i change a:msg to msg here, vim crashes
   call ch_log( "Got a message without a callback: " .. string( a:msg ) )
@@ -139,14 +144,16 @@ function! s:OnChannelMessage( chan, msg ) abort
   endif
 
   if a:msg.Function ==# 'evaluate'
-    " FIXME: This ignores Arguments.stack_level and therefore doesn't work for
-    " local vars etc.
-    try
-      let result = debug_eval( a:msg.Arguments.stack_level,
-                             \ a:msg.Arguments.expression )
-    catch /.*/
-      let result = v:exception
-    endtry
+    if a:msg.Arguments.expression[ 0 ] == ':'
+        let result = execute( a:msg.Arguments.expression[ 1: ] )
+    else
+      try
+        let result = string( debug_eval( a:msg.Arguments.stack_level,
+                                       \ a:msg.Arguments.expression ) )
+      catch /.*/
+        let result = v:exception
+      endtry
+    endif
 
     " FIXME: type( result ) returns a number whereas the vars result is a string
     " naming the type.
